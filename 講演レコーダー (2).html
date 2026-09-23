@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>講演レコーダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<style>
+:root{
+  --bg:#EDF0F3; --panel:#FFFFFF; --ink:#1B2633; --sub:#5B6776; --line:#D3D9E0;
+  --blue:#2E5B88; --blue-soft:#E3ECF5; --rec:#CF3434; --rec-soft:#FBE6E6;
+  --mark:#1F8378; --mark-soft:#DDF1EE; --warn:#B7791F;
+  --font:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#131A22; --panel:#1C2530; --ink:#E6EBF0; --sub:#9AA6B3; --line:#2E3A47;
+    --blue:#7FA9D6; --blue-soft:#22324A; --rec:#F06262; --rec-soft:#3A2226;
+    --mark:#5CC3B6; --mark-soft:#1D3533; --warn:#E0A84C;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#131A22; --panel:#1C2530; --ink:#E6EBF0; --sub:#9AA6B3; --line:#2E3A47;
+  --blue:#7FA9D6; --blue-soft:#22324A; --rec:#F06262; --rec-soft:#3A2226;
+  --mark:#5CC3B6; --mark-soft:#1D3533; --warn:#E0A84C;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.7}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.app{display:grid;grid-template-columns:300px 1fr;min-height:100vh;max-width:1280px;margin:0 auto}
+aside{border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+main{padding:24px clamp(16px,3vw,40px) 60px;min-width:0}
+.brand{font-weight:700;font-size:1.15rem;display:flex;align-items:center;gap:8px}
+.brand .dot{width:12px;height:12px;border-radius:50%;background:var(--rec)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 14px;font-weight:500;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn:hover:not(:disabled){border-color:var(--blue)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#0f1720}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#0f1720}}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--rec)}
+.search{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.list button{width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:8px 10px;display:block}
+.list button:hover{background:var(--blue-soft)}
+.list button.active{background:var(--blue-soft);box-shadow:inset 3px 0 0 var(--blue)}
+.list .t{font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .d{font-size:.8rem;color:var(--sub)}
+.empty{color:var(--sub);font-size:.9rem;padding:8px 4px}
+.fields{display:grid;grid-template-columns:2fr 1fr;gap:12px 16px;margin-bottom:20px}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--sub)}
+.fields input{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);font-size:1rem;color:var(--ink)}
+.fields .wide{grid-column:1/-1}
+.title-input{font-size:1.35rem!important;font-weight:700}
+/* recorder */
+.deck{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center}
+.recwrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+.recbtn{width:112px;height:112px;border-radius:50%;border:6px solid var(--rec-soft);background:var(--rec);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;gap:4px;transition:transform .15s}
+.recbtn:active{transform:scale(.96)}
+.recbtn .ic{width:30px;height:30px;border-radius:50%;background:#fff}
+.recbtn.on .ic{border-radius:5px;width:26px;height:26px}
+.recbtn:disabled{filter:grayscale(1);opacity:.5}
+.subbtns{display:flex;gap:8px}
+.meter-area{display:flex;flex-direction:column;gap:10px;min-width:0}
+.timer{font-size:clamp(2.4rem,6vw,3.6rem);font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
+.statusline{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:.85rem;color:var(--sub);align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:var(--bg);font-size:.8rem}
+.pill.rec{background:var(--rec-soft);color:var(--rec)}
+.pill.rec::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--rec);animation:blink 1.2s infinite}
+.pill.pause{background:var(--blue-soft);color:var(--blue)}
+@keyframes blink{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){.pill.rec::before{animation:none}}
+canvas#wave{width:100%;height:56px;display:block;border-radius:8px;background:var(--bg)}
+.progress{height:6px;background:var(--bg);border-radius:3px;position:relative;overflow:hidden}
+.progress i{position:absolute;left:0;top:0;bottom:0;background:var(--blue);width:0}
+.progress.over i{background:var(--warn)}
+.progress-label{display:flex;justify-content:space-between;font-size:.75rem;color:var(--sub)}
+.microw{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:.85rem;color:var(--sub);margin-top:4px}
+.microw label{display:inline-flex;align-items:center;gap:6px}
+.microw select{max-width:220px;padding:4px 8px}
+.microw input[type=range]{width:120px;accent-color:var(--blue)}
+.markbtn{background:var(--mark-soft);color:var(--mark);border-color:transparent}
+/* sections */
+.section{margin-top:28px}
+.section h2{font-size:1.05rem;margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.section h2 .spacer{flex:1}
+.transcript{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;max-height:340px;overflow:auto;font-size:.95rem}
+.seg{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:3px 0}
+.seg .ts{color:var(--sub);font-variant-numeric:tabular-nums;font-size:.8rem;padding-top:3px}
+.seg.bm .ts{color:var(--mark);font-weight:700}
+.seg.bm .tx{color:var(--mark)}
+.interim{color:var(--sub)}
+textarea.edit{width:100%;min-height:260px;border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel);resize:vertical;line-height:1.7}
+textarea.memo{min-height:90px}
+.notice{border-left:3px solid var(--warn);background:var(--panel);padding:10px 14px;border-radius:0 8px 8px 0;font-size:.9rem;margin:12px 0}
+.notice.err{border-color:var(--rec)}
+.summary{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px}
+.summary h3{font-size:.95rem;color:var(--blue);margin:18px 0 6px}
+.summary h3:first-child{margin-top:0}
+.summary p{margin:0 0 6px;max-width:72ch}
+.summary ul{margin:0;padding-left:1.3em;max-width:72ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{background:var(--blue-soft);color:var(--blue);padding:2px 10px;border-radius:999px;font-size:.85rem}
+.qa dt{font-weight:700}
+.qa dd{margin:0 0 8px 1.2em}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.thinking{color:var(--sub);display:flex;align-items:center;gap:10px}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+audio{width:100%;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-size:.9rem;opacity:0;pointer-events:none;transition:opacity .2s;z-index:10;max-width:90vw}
+.toast.show{opacity:1}
+.dialog-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.dialog-bg.show{display:flex}
+.dialog{background:var(--panel);border-radius:12px;padding:20px;max-width:380px;width:100%}
+.dialog p{margin:0 0 16px}
+.dialog .toolbar{justify-content:flex-end}
+.hint{font-size:.8rem;color:var(--sub)}
+.hidden{display:none!important}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--line);max-height:none}
+  .list{max-height:220px}
+  .deck{grid-template-columns:1fr;justify-items:stretch}
+  .recwrap{flex-direction:row;justify-content:center;gap:16px}
+  .subbtns{flex-direction:column}
+  .fields{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="dot"></span>講演レコーダー</div>
+    <button class="btn primary" id="newBtn">＋ 新しい講演を記録</button>
+    <input class="search" id="search" type="search" placeholder="タイトル・学会名・講演者で検索">
+    <ul class="list" id="list"></ul>
+    <div class="hint" id="storageNote"></div>
+  </aside>
+
+  <main>
+    <div id="globalNotice"></div>
+    <details class="notice hidden" id="fileHelp"><summary><b>ファイル版での注意</b>（文字起こしが動かないとき）</summary>
+      <p style="margin:8px 0 4px">Chromeは、ダウンロードしたファイル（アドレスが <code>file:///</code> で始まる）で開いたページでは、リアルタイム音声認識を拒否することがあります。その場合は次のどちらかで開いてください。</p>
+      <ol style="margin:0;padding-left:1.3em">
+        <li>パソコンにPythonがあれば、このファイルがあるフォルダでターミナル（Windowsはコマンドプロンプト）を開いて <code>python -m http.server 8000</code> を実行し、Chromeで <code>http://localhost:8000/</code> からファイルを開きます。</li>
+        <li>録音だけ行い、あとで別の文字起こし（Word・Teams・Googleドキュメントの音声入力など）を「文字起こし」の「編集」から貼り付けます。</li>
+      </ol>
+      <p class="hint" style="margin:6px 0 0">※ localhostで開くと保存先も別になります（file://で保存した記録はfile://で開いたときに表示されます）。</p>
+    </details>
+
+    <div class="fields">
+      <label class="wide">タイトル<input id="fTitle" class="title-input" placeholder="例：〇〇における△△の検討"></label>
+      <label>学会名・セッション<input id="fConf" placeholder="例：第45回 日本〇〇学会 シンポジウム2"></label>
+      <label>日付<input id="fDate" type="date"></label>
+      <label class="wide">講演者<input id="fSpeaker" placeholder="例：山田 太郎（〇〇大学）"></label>
+    </div>
+
+    <!-- recorder -->
+    <div class="deck" id="deck">
+      <div class="recwrap">
+        <button class="recbtn" id="recBtn" aria-label="録音開始"><span class="ic"></span><span id="recLabel">録音</span></button>
+        <div class="subbtns">
+          <button class="btn" id="pauseBtn" disabled>一時停止</button>
+          <button class="btn markbtn" id="markBtn" disabled title="今の発言を「重要」として記録し、要約で重視します">★ 重要</button>
+        </div>
+      </div>
+      <div class="meter-area">
+        <div class="timer" id="timer">00:00</div>
+        <div class="statusline">
+          <span class="pill" id="statePill">待機中</span>
+          <span id="sttState">文字起こし：確認中</span>
+          <span id="saveState"></span>
+        </div>
+        <canvas id="wave" height="56"></canvas>
+        <div>
+          <div class="progress" id="progress"><i id="progressBar"></i></div>
+          <div class="progress-label"><span>0分</span><span>10分</span><span>20分</span></div>
+        </div>
+        <div class="microw">
+          <label>マイク<select id="micSel" aria-label="使うマイク"><option value="">既定のマイク</option></select></label>
+          <label>感度<input type="range" id="gainR" min="1" max="8" step="0.5" aria-label="マイク感度"><span id="gainV"></span></label>
+          <label title="ノイズ除去を切り、音量を自動で持ち上げます。講演会場の後方など、話者から遠いときに向きます"><input type="checkbox" id="farChk">遠くの声モード</label>
+          <button class="btn ghost" id="micTestBtn" type="button">マイクテスト</button>
+        </div>
+        <div class="hint" id="micHint">録音前に「マイクテスト」で波形を見ながら感度を調整できます。話し声で波形が枠の半分くらいまで振れるのが目安です。</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>文字起こし<span class="spacer"></span>
+        <button class="btn ghost" id="editTxBtn">編集</button>
+      </h2>
+      <div class="transcript" id="transcript"><div class="empty">録音を始めると、ここに講演内容がリアルタイムで表示されます。</div></div>
+      <textarea class="edit hidden" id="txEdit" placeholder="文字起こしを直接入力・貼り付けることもできます。"></textarea>
+    </div>
+
+    <div class="section">
+      <h2>自分のメモ</h2>
+      <textarea class="edit memo" id="memo" placeholder="気になった点、質問したいこと、スライドの数値など。要約にも反映されます。"></textarea>
+    </div>
+
+    <div class="section" id="summarySection">
+      <h2>要約<span class="spacer"></span>
+        <select id="level" aria-label="要約の詳しさ">
+          <option value="short">簡潔</option>
+          <option value="normal" selected>標準</option>
+          <option value="long">詳細</option>
+        </select>
+        <button class="btn primary" id="sumBtn" disabled>要約を作成</button>
+        <button class="btn hidden" id="stopSumBtn">中止</button>
+      </h2>
+      <div id="summaryBox" class="summary"><div class="empty">録音を停止すると、文字起こしから要約を作成できます。</div></div>
+    </div>
+
+    <div class="section">
+      <h2>出力・保存</h2>
+      <div class="toolbar">
+        <button class="btn" id="docxBtn" disabled>Wordで出力（.docx）</button>
+        <button class="btn" id="pdfBtn" disabled>PDFで出力</button>
+        <button class="btn" id="txtBtn" disabled>文字起こし（.txt）</button>
+        <button class="btn" id="audioBtn" disabled>音声（.webm）</button>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn ghost danger" id="delBtn" disabled>この記録を削除</button>
+      </div>
+      <div id="audioBox"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="dialog-bg" id="dlg"><div class="dialog"><p id="dlgMsg"></p><div class="toolbar"><button class="btn" id="dlgNo">キャンセル</button><button class="btn primary" id="dlgYes">OK</button></div></div></div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const fmt = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s/3600), m = Math.floor(s%3600/60); return (h ? h + ":" : "") + pad(m) + ":" + pad(s%60); };
+const today = () => { const d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); };
+const uid4 = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+/* ---------- capabilities ---------- */
+let db = null, userId = null, sample = null, downloads = null, assets = null, col = null;
+const localRecords = new Map(); // fallback when db unavailable
+const audioCache = new Map();   // id -> Blob (this session)
+
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 3200); }
+function confirmDlg(msg){ return new Promise(res => { $("dlgMsg").textContent = msg; $("dlg").classList.add("show");
+  const done = v => { $("dlg").classList.remove("show"); $("dlgYes").onclick = $("dlgNo").onclick = null; res(v); };
+  $("dlgYes").onclick = () => done(true); $("dlgNo").onclick = () => done(false); }); }
+function notice(msg, err){ const n = document.createElement("div"); n.className = "notice" + (err ? " err" : ""); n.textContent = msg; $("globalNotice").appendChild(n); return n; }
+
+/* local storage (IndexedDB) — used when the page is opened as a downloaded file */
+let idb = null, capsReady = false;
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error("no-idb"));
+    const rq = indexedDB.open("lecture-recorder", 1);
+    rq.onupgradeneeded = () => { const d = rq.result; if (!d.objectStoreNames.contains("records")) d.createObjectStore("records", { keyPath: "id" }); if (!d.objectStoreNames.contains("audio")) d.createObjectStore("audio"); };
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+}
+function idbReq(store, m, ...args){
+  return new Promise((res, rej) => {
+    if (!idb) return rej(new Error("no-idb"));
+    const tx = idb.transaction(store, m === "get" || m === "getAll" ? "readonly" : "readwrite");
+    const rq = tx.objectStore(store)[m](...args);
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+}
+async function initLocal(){
+  try {
+    idb = await idbOpen();
+    const all = await idbReq("records", "getAll");
+    all.forEach(r => localRecords.set(r.id, r));
+    $("storageNote").textContent = "記録はこのパソコンのChrome内に自動保存されます。同じPC・同じブラウザでこのファイルを開けば続きから使えます。念のため大事な記録はWord・PDFでも出力してください。";
+  } catch (e) {
+    idb = null;
+    $("storageNote").textContent = "このブラウザでは自動保存できません。画面を閉じる前に「出力・保存」からファイルに保存してください。";
+  }
+  renderList();
+}
+
+async function initCaps(){
+  if (!window.claude || !window.claude.use) { await initLocal(); capsReady = true; updateButtons(); renderSummary(); return; }
+  const [d, u, s, dl, a] = await Promise.all(["db","user","sample","downloads","assets"].map(n => window.claude.use(n).catch(() => null)));
+  db = d; sample = s; downloads = dl; assets = a;
+  if (u) { try { userId = await u.id(); } catch(e) {} }
+  if (db) {
+    col = userId ? db.doc("data/users/" + userId + "/app/lectures").collection("items") : db.collection("lectures");
+    $("storageNote").textContent = userId ? "記録はあなた専用の領域に保存されます。" : "記録はこのページに保存されます。";
+    col.onSnapshot(snap => { records = snap.docs.filter(x => x.exists).map(x => x.data()); renderList(); syncOpenFromRemote(); },
+      e => { $("storageNote").textContent = "保存データを読み込めませんでした（" + e.code + "）。"; });
+  } else {
+    await initLocal();
+  }
+  capsReady = true;
+  updateButtons(); renderSummary();
+}
+
+/* ---------- data ---------- */
+let records = [];
+let cur = null;       // record being shown / recorded
+let saving = Promise.resolve();
+let dirty = false;
+
+function newRecord(){
+  return { id: uid4(), title: "", conference: "", speaker: "", date: today(), createdAt: Date.now(), updatedAt: Date.now(),
+    durationSec: 0, segments: [], bookmarks: [], memo: "", summary: null, summaryLevel: "normal", audioAssetId: null, status: "draft" };
+}
+function allRecords(){ return db ? records : [...localRecords.values()]; }
+
+function save(){
+  if (!cur) return saving;
+  const snapshot = JSON.parse(JSON.stringify(cur));
+  snapshot.updatedAt = Date.now();
+  if (!db) {
+    localRecords.set(snapshot.id, snapshot); renderList();
+    if (!idb) return Promise.resolve();
+    $("saveState").textContent = "保存中…";
+    saving = saving.then(() => idbReq("records", "put", snapshot))
+      .then(() => { $("saveState").textContent = "保存済み（このPC）"; dirty = false; })
+      .catch(e => { $("saveState").textContent = "保存できませんでした（" + ((e && e.name) || "error") + "）"; });
+    return saving;
+  }
+  $("saveState").textContent = "保存中…";
+  saving = saving.then(() => col.doc(snapshot.id).set(snapshot))
+    .then(() => { $("saveState").textContent = "保存済み"; dirty = false; })
+    .catch(e => { $("saveState").textContent = "保存できませんでした（" + (e.code || "error") + "）"; });
+  return saving;
+}
+let saveTimer = null;
+function saveSoon(){ dirty = true; clearTimeout(saveTimer); saveTimer = setTimeout(save, 800); }
+
+function syncOpenFromRemote(){
+  if (!cur || mode !== "idle") return;
+  const r = records.find(x => x.id === cur.id);
+  if (!r && cur.status !== "draft" && !localRecords.has(cur.id)) return;
+}
+
+/* ---------- list ---------- */
+function renderList(){
+  const q = $("search").value.trim().toLowerCase();
+  const items = allRecords().filter(r => r.status !== "draft" || (cur && r.id === cur.id))
+    .filter(r => !q || [r.title, r.conference, r.speaker].join(" ").toLowerCase().includes(q))
+    .sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.createdAt - a.createdAt);
+  const ul = $("list"); ul.innerHTML = "";
+  if (!items.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = q ? "該当する記録はありません。" : "まだ記録はありません。講演が始まったら録音ボタンを押してください。"; ul.appendChild(li); return; }
+  for (const r of items) {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.className = cur && cur.id === r.id ? "active" : "";
+    const t = document.createElement("span"); t.className = "t"; t.textContent = r.title || "（無題の講演）";
+    const d = document.createElement("span"); d.className = "d";
+    d.textContent = (r.date || "") + (r.durationSec ? "　" + fmt(r.durationSec) : "") + (r.conference ? "　" + r.conference : "") + (r.summary ? "" : "　要約なし");
+    b.append(t, d); b.onclick = () => openRecord(r.id);
+    li.appendChild(b); ul.appendChild(li);
+  }
+}
+$("search").addEventListener("input", renderList);
+
+async function openRecord(id){
+  if (mode !== "idle") { toast("録音中は他の記録を開けません。先に停止してください。"); return; }
+  if (dirty) await save();
+  const r = allRecords().find(x => x.id === id); if (!r) return;
+  cur = JSON.parse(JSON.stringify(r));
+  showRecord();
+}
+function showRecord(){
+  $("fTitle").value = cur.title; $("fConf").value = cur.conference; $("fSpeaker").value = cur.speaker; $("fDate").value = cur.date;
+  $("memo").value = cur.memo || ""; $("level").value = cur.summaryLevel || "normal";
+  $("timer").textContent = fmt(cur.durationSec); setProgress(cur.durationSec);
+  closeTxEdit(false); renderTranscript(); renderSummary(); renderAudio(); renderList(); updateButtons();
+  $("saveState").textContent = "";
+}
+$("newBtn").onclick = async () => {
+  if (mode !== "idle") { toast("録音中です。先に停止してください。"); return; }
+  if (dirty) await save();
+  cur = newRecord(); showRecord(); $("fTitle").focus();
+};
+
+/* fields */
+[["fTitle","title"],["fConf","conference"],["fSpeaker","speaker"],["fDate","date"],["memo","memo"]].forEach(([el, key]) => {
+  $(el).addEventListener("input", () => { if (!cur) cur = newRecord(); cur[key] = $(el).value; if (cur.status !== "draft" || mode !== "idle") saveSoon(); if (key !== "memo") renderListSoon(); });
+});
+let rlT; function renderListSoon(){ clearTimeout(rlT); rlT = setTimeout(renderList, 300); }
+
+/* ---------- transcript ---------- */
+let interimText = "";
+function renderTranscript(){
+  const box = $("transcript"); box.innerHTML = "";
+  if (!cur || (!cur.segments.length && !interimText)) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.textContent = mode === "idle" ? "録音を始めると、ここに講演内容がリアルタイムで表示されます。" : "音声を聞き取っています…";
+    box.appendChild(e); return;
+  }
+  const bms = cur.bookmarks || [];
+  cur.segments.forEach((s, i) => {
+    const next = cur.segments[i+1] ? cur.segments[i+1].t : Infinity;
+    const isBm = bms.some(b => b.t >= s.t - 8 && b.t < next);
+    const row = document.createElement("div"); row.className = "seg" + (isBm ? " bm" : "");
+    const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = (isBm ? "★" : "") + fmt(s.t);
+    const tx = document.createElement("span"); tx.className = "tx"; tx.textContent = s.text;
+    row.append(ts, tx); box.appendChild(row);
+  });
+  if (interimText) { const row = document.createElement("div"); row.className = "seg";
+    const ts = document.createElement("span"); ts.className = "ts"; ts.textContent = fmt(elapsed());
+    const tx = document.createElement("span"); tx.className = "tx interim"; tx.textContent = interimText; row.append(ts, tx); box.appendChild(row); }
+  if (mode !== "idle") box.scrollTop = box.scrollHeight;
+}
+function segmentsToText(segs){ return segs.map(s => "[" + fmt(s.t) + "] " + s.text).join("\n"); }
+function textToSegments(txt){
+  return txt.split(/\n+/).map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(/^\[(?:(\d+):)?(\d{1,2}):(\d{2})\]\s*(.*)$/);
+    if (m) return { t: (+(m[1]||0))*3600 + (+m[2])*60 + (+m[3]), text: m[4] };
+    return { t: 0, text: l };
+  });
+}
+let txEditing = false;
+$("editTxBtn").onclick = () => { txEditing ? closeTxEdit(true) : openTxEdit(); };
+function openTxEdit(){
+  if (mode !== "idle") { toast("録音を停止してから編集できます。"); return; }
+  if (!cur) cur = newRecord();
+  txEditing = true; $("txEdit").value = segmentsToText(cur.segments); $("txEdit").classList.remove("hidden"); $("transcript").classList.add("hidden");
+  $("editTxBtn").textContent = "編集を保存"; $("txEdit").focus();
+}
+function closeTxEdit(apply){
+  if (apply && cur) { cur.segments = textToSegments($("txEdit").value); if (cur.segments.length && cur.status === "draft") cur.status = "done"; save(); toast("文字起こしを保存しました"); }
+  txEditing = false; $("txEdit").classList.add("hidden"); $("transcript").classList.remove("hidden"); $("editTxBtn").textContent = "編集";
+  renderTranscript(); updateButtons();
+}
+
+/* ---------- recording ---------- */
+let mode = "idle"; // idle | recording | paused
+let mediaStream = null, recorder = null, chunks = [], mimeType = "";
+let activeMs = 0, runStart = 0, tick = null;
+let audioCtx = null, analyser = null, rafId = null, levels = [];
+let procStream = null, procTrack = null, gainNode = null, micIdleT = null, micKey = "", micTesting = false;
+const MIC_KEY = "lecrec.mic";
+let micSet = { deviceId: "", gain: 2.5, far: true };
+try { Object.assign(micSet, JSON.parse(localStorage.getItem(MIC_KEY) || "{}")); } catch (e) {}
+function saveMicSet(){ try { localStorage.setItem(MIC_KEY, JSON.stringify(micSet)); } catch (e) {} }
+let recog = null, wakeLock = null, autosaveT = null;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+$("sttState").textContent = SR ? "文字起こし：待機中" : "文字起こし：このブラウザは非対応";
+if (location.protocol === "file:" && SR) $("fileHelp").classList.remove("hidden");
+if (!SR) notice("このブラウザはリアルタイム文字起こしに対応していません（Chrome・Edge推奨）。録音はできますが、要約には文字起こしを「編集」から貼り付ける必要があります。");
+
+const elapsed = () => (activeMs + (mode === "recording" ? Date.now() - runStart : 0)) / 1000;
+
+function pickMime(){
+  const c = ["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+  for (const m of c) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) return m;
+  return "";
+}
+
+$("recBtn").onclick = () => mode === "idle" ? startRec() : stopRec();
+$("pauseBtn").onclick = () => mode === "recording" ? pauseRec() : resumeRec();
+$("markBtn").onclick = () => {
+  if (!cur || mode === "idle") return;
+  const t = Math.max(0, elapsed() - 3);
+  cur.bookmarks.push({ t, label: "" });
+  toast("★ " + fmt(t) + " を重要としてマークしました"); renderTranscript();
+};
+
+async function startRec(){
+  if (!window.MediaRecorder || !navigator.mediaDevices) { notice("このブラウザでは録音できません。最新のChrome・Edge・Safariでお試しください。", true); return; }
+  if (txEditing) closeTxEdit(true);
+  if (cur && (cur.segments.length || cur.durationSec)) {
+    const ok = await confirmDlg("この記録にはすでに内容があります。新しい講演として録音を始めますか？（今の記録は保存されたまま残ります）");
+    if (!ok) return;
+    if (dirty) await save();
+    const keep = { conference: cur.conference, date: today() };
+    cur = newRecord(); Object.assign(cur, keep); showRecord();
+  }
+  if (!cur) cur = newRecord();
+  try {
+    await ensureMic();
+  } catch (e) {
+    notice(e && e.name === "NotAllowedError"
+      ? "マイクの使用が許可されていません。ブラウザのアドレスバー付近のマイク設定から許可してから、もう一度録音ボタンを押してください。"
+      : "マイクを起動できませんでした（" + (e && e.name || "不明なエラー") + "）。マイクが接続されているか確認してください。", true);
+    return;
+  }
+  mimeType = pickMime(); chunks = [];
+  micTesting = false; $("micTestBtn").textContent = "マイクテスト";
+  recorder = new MediaRecorder(procStream || mediaStream, mimeType ? { mimeType, audioBitsPerSecond: 48000 } : undefined);
+  recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recorder.start(1000);
+  cur.status = "recording"; cur.segments = []; cur.bookmarks = []; cur.durationSec = 0;
+  if (!cur.title) { cur.title = "講演 " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); $("fTitle").value = cur.title; }
+  activeMs = 0; runStart = Date.now(); mode = "recording";
+  sttStartedAt = 0; sttErrs = []; sttLastErr = "";
+  startRecog(); requestWake();
+  tick = setInterval(() => { const s = elapsed(); $("timer").textContent = fmt(s); setProgress(s); checkSttSilence(); }, 250);
+  autosaveT = setInterval(() => { cur.durationSec = elapsed(); save(); }, 30000);
+  save(); renderTranscript(); renderSummary(); renderAudio(); updateButtons(); renderList();
+}
+function pauseRec(){
+  if (mode !== "recording") return;
+  recorder.pause(); activeMs += Date.now() - runStart; mode = "paused";
+  stopRecog(); flushInterim(); updateButtons();
+}
+function resumeRec(){
+  if (mode !== "paused") return;
+  recorder.resume(); runStart = Date.now(); mode = "recording"; lastHeard = Date.now(); startRecog(); updateButtons();
+}
+async function stopRec(){
+  if (mode === "idle") return;
+  if (mode === "recording") activeMs += Date.now() - runStart;
+  mode = "idle";
+  clearInterval(tick); clearInterval(autosaveT);
+  stopRecog(); flushInterim();
+  const stopped = new Promise(r => { recorder.onstop = r; });
+  try { recorder.stop(); } catch (e) {}
+  await stopped;
+  scheduleMicRelease();
+  releaseWake();
+  cur.durationSec = activeMs / 1000; cur.status = "done";
+  $("timer").textContent = fmt(cur.durationSec);
+  const blob = new Blob(chunks, { type: mimeType || "audio/webm" }); chunks = [];
+  audioCache.set(cur.id, blob);
+  updateButtons(); renderTranscript(); renderAudio();
+  await save();
+  uploadAudio(cur.id, blob);
+  if (!cur.segments.length) {
+    notice(SR ? "音声を文字として聞き取れませんでした。マイクが話者に届いているか確認してください。文字起こしは「編集」から入力することもできます。"
+              : "文字起こしがありません。「編集」から文字起こしを貼り付けると要約できます。");
+  } else toast("録音を停止して保存しました。「要約を作成」を押してください。");
+}
+
+async function uploadAudio(id, blob){
+  if (!assets && idb && blob.size) {
+    try {
+      await idbReq("audio", "put", blob, id);
+      const r = cur && cur.id === id ? cur : localRecords.get(id);
+      if (r) { r.hasLocalAudio = true; if (cur && cur.id === id) await save(); else await idbReq("records", "put", r); }
+    } catch (e) { toast("音声を自動保存できませんでした。「音声」ボタンでファイルに保存してください。"); }
+    renderAudio(); updateButtons(); return;
+  }
+  if (!assets || !blob.size) { renderAudio(); return; }
+  const kind = (blob.type.includes("mp4") ? "video/mp4" : "video/webm");
+  try {
+    const res = await assets.upload(new Blob([blob], { type: kind }));
+    const r = cur && cur.id === id ? cur : allRecords().find(x => x.id === id);
+    if (r) { r.audioAssetId = res.id; if (cur && cur.id === id) { await save(); renderAudio(); } else if (db) await col.doc(id).update({ audioAssetId: res.id }); }
+  } catch (e) {
+    if (cur && cur.id === id) { $("audioBox").querySelector(".hint") && ($("audioBox").querySelector(".hint").textContent = "音声はこの画面を開いている間だけ再生・保存できます。必要なら今「音声」ボタンで保存してください。"); }
+  }
+}
+
+/* speech recognition */
+let srTrackOK = null;
+let sttShown = new Set(), sttErrs = [], lastHeard = 0, sttStartedAt = 0, sttSilentWarned = false, sttLastErr = "";
+const STT_MSG = {
+  "not-allowed": "文字起こしのためのマイク利用がブロックされています。アドレスバー右端のマイクアイコン（またはchrome://settings/content/microphone）でこのページを「許可」にし、ページを再読み込みしてください。ダウンロードしたファイル（file://）で開いていると、Chromeが音声認識を許可しないことがあります。その場合は下の「ファイル版での注意」を参照してください。",
+  "service-not-allowed": "Chromeの音声認識サービスが使えない状態です。Chromeを最新版に更新し、シークレットウィンドウではなく通常のウィンドウで開いてください。",
+  "network": "音声認識サーバーに接続できません。Chromeのリアルタイム文字起こしはインターネット経由（Googleのサーバー）で動くため、ネット接続が必要です。大学・会場のWi-Fiで制限されている場合は、スマホのテザリングなどでお試しください。",
+  "audio-capture": "文字起こし用にマイクを取得できませんでした。ほかのアプリ（Zoom・Teamsなど）がマイクを使っていないか確認してください。",
+  "language-not-supported": "日本語の音声認識が利用できません。Chromeを最新版に更新してください。"
+};
+function sttNotice(code){
+  if (sttShown.has(code)) return; sttShown.add(code);
+  notice(STT_MSG[code] || ("文字起こしでエラーが起きました（" + code + "）。"), true);
+}
+function startRecog(){
+  if (!SR) return;
+  const r0 = new SR(); recog = r0; r0.lang = "ja-JP"; r0.continuous = true; r0.interimResults = true; r0.maxAlternatives = 1;
+  if (!sttStartedAt) { sttStartedAt = Date.now(); lastHeard = Date.now(); sttSilentWarned = false; }
+  r0.onstart = () => { $("sttState").textContent = r0._track && srTrackOK ? "文字起こし：動作中（感度補正あり）" : "文字起こし：動作中"; };
+  r0.onresult = ev => { lastHeard = Date.now(); if (r0._track && srTrackOK === null) { srTrackOK = true; $("sttState").textContent = "文字起こし：動作中（感度補正あり）"; }
+    let interim = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      const r = ev.results[i];
+      if (r.isFinal) { const txt = r[0].transcript.trim(); if (txt) { cur.segments.push({ t: Math.max(0, elapsed() - Math.min(10, txt.length / 6)), text: txt }); } }
+      else interim += r[0].transcript;
+    }
+    interimText = interim; renderTranscript();
+  };
+  r0.onerror = ev => {
+    const c = ev.error; if (c === "no-speech" || c === "aborted") return;
+    sttLastErr = c;
+    if (r0._track && c !== "network") { srTrackOK = false; return; } // retry without the boosted track (onend restarts)
+    if (c === "not-allowed" || c === "service-not-allowed" || c === "language-not-supported") {
+      $("sttState").textContent = "文字起こし：停止（" + c + "）"; if (recog === r0) recog = null; sttNotice(c); return;
+    }
+    $("sttState").textContent = "文字起こし：再接続中（" + c + "）";
+    const now = Date.now(); sttErrs = sttErrs.filter(t => now - t < 20000); sttErrs.push(now);
+    if (sttErrs.length >= 5) { $("sttState").textContent = "文字起こし：停止（" + c + "）"; if (recog === r0) recog = null; sttNotice(c); }
+  };
+  r0.onend = () => {
+    if (mode === "recording" && recog === r0) setTimeout(() => { if (mode === "recording" && recog === r0) startRecog(); }, 300);
+  };
+  r0._track = false;
+  try {
+    let started = false;
+    if (srTrackOK !== false && procTrack && procTrack.readyState === "live") { try { r0.start(procTrack); r0._track = true; started = true; } catch (e) { srTrackOK = false; } }
+    if (!started) r0.start();
+    $("sttState").textContent = "文字起こし：起動中…";
+  }
+  catch (e) { $("sttState").textContent = "文字起こし：起動できません"; }
+}
+function checkSttSilence(){
+  if (!SR || mode !== "recording" || sttSilentWarned || !sttStartedAt) return;
+  const loud = levels.slice(-60).filter(v => v > 0.08).length > 10;
+  if (loud && recog && recog._track && srTrackOK === null && Date.now() - lastHeard > 15000) {
+    // boosted track accepted but nothing comes back: fall back to Chrome's own mic input
+    srTrackOK = false; lastHeard = Date.now(); try { recog.abort(); } catch (e) {} return;
+  }
+  if (loud && Date.now() - lastHeard > 25000) {
+    sttSilentWarned = true;
+    notice("マイクには音が入っていますが、文字起こしの結果が返ってきません" + (sttLastErr ? "（" + sttLastErr + "）" : "") + "。" +
+      (location.protocol === "file:" ? "ダウンロードしたファイルとして開いているとChromeの音声認識が動かないことがあります。下の「ファイル版での注意」を確認してください。" : "インターネット接続を確認し、一度停止してから録音し直してください。"), true);
+  }
+}
+function stopRecog(){ if (mode === "idle") sttStartedAt = 0; if (recog) { const r = recog; recog = null; try { r.stop(); } catch(e){} } if (SR) $("sttState").textContent = mode === "paused" ? "文字起こし：一時停止中" : "文字起こし：待機中"; }
+function flushInterim(){ if (interimText.trim() && cur) cur.segments.push({ t: elapsed(), text: interimText.trim() }); interimText = ""; renderTranscript(); }
+
+/* microphone: opened once and reused, so Chrome asks for permission less often */
+function micAlive(){ return !!(mediaStream && mediaStream.getAudioTracks().some(t => t.readyState === "live")); }
+async function ensureMic(){
+  const key = micSet.deviceId + "|" + micSet.far;
+  clearTimeout(micIdleT);
+  if (micAlive() && key === micKey) { if (audioCtx && audioCtx.state === "suspended") audioCtx.resume().catch(() => {}); return; }
+  releaseMic(true);
+  const c = { channelCount: 1, autoGainControl: true, echoCancellation: !micSet.far, noiseSuppression: !micSet.far };
+  if (micSet.deviceId) c.deviceId = { exact: micSet.deviceId };
+  try { mediaStream = await navigator.mediaDevices.getUserMedia({ audio: c }); }
+  catch (e) {
+    if (e && e.name === "OverconstrainedError" && micSet.deviceId) { micSet.deviceId = ""; saveMicSet(); delete c.deviceId; mediaStream = await navigator.mediaDevices.getUserMedia({ audio: c }); }
+    else throw e;
+  }
+  micKey = micSet.deviceId + "|" + micSet.far;
+  mediaStream.getAudioTracks().forEach(t => t.onended = () => { if (mode === "idle") releaseMic(); });
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    const hp = audioCtx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 90;
+    gainNode = audioCtx.createGain(); gainNode.gain.value = micSet.gain;
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.value = -26; comp.knee.value = 18; comp.ratio.value = 6; comp.attack.value = 0.005; comp.release.value = 0.25;
+    const dest = audioCtx.createMediaStreamDestination();
+    src.connect(hp); hp.connect(gainNode); gainNode.connect(comp); comp.connect(dest);
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 1024; comp.connect(analyser);
+    procStream = dest.stream; procTrack = procStream.getAudioTracks()[0] || null;
+  } catch (e) { analyser = null; procStream = null; procTrack = null; gainNode = null; }
+  startMeter(); listMics();
+}
+function releaseMic(keepUi){
+  clearTimeout(micIdleT);
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  if (procStream) procStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close().catch(() => {});
+  mediaStream = procStream = procTrack = null; audioCtx = analyser = gainNode = null; micKey = "";
+  cancelAnimationFrame(rafId); rafId = null;
+  if (!keepUi) { micTesting = false; $("micTestBtn").textContent = "マイクテスト"; levels = []; drawLevels(); }
+}
+// keep the mic for 15 minutes after a recording so the next talk starts without a new permission prompt
+function scheduleMicRelease(){ clearTimeout(micIdleT); micIdleT = setTimeout(() => { if (mode === "idle" && !micTesting) releaseMic(); }, 15 * 60 * 1000); }
+window.addEventListener("pagehide", () => releaseMic());
+
+async function listMics(){
+  try {
+    const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput" && d.deviceId !== "default" && d.deviceId !== "communications");
+    const sel = $("micSel"), curV = micSet.deviceId; sel.innerHTML = "";
+    const o0 = document.createElement("option"); o0.value = ""; o0.textContent = "既定のマイク"; sel.appendChild(o0);
+    devs.forEach((d, i) => { const o = document.createElement("option"); o.value = d.deviceId; o.textContent = d.label || ("マイク " + (i + 1)); sel.appendChild(o); });
+    sel.value = devs.some(d => d.deviceId === curV) ? curV : "";
+  } catch (e) {}
+}
+$("gainR").value = micSet.gain; $("gainV").textContent = "×" + micSet.gain; $("farChk").checked = !!micSet.far;
+$("gainR").oninput = () => { micSet.gain = +$("gainR").value; $("gainV").textContent = "×" + micSet.gain; if (gainNode) gainNode.gain.value = micSet.gain; saveMicSet(); };
+function micChanged(){
+  saveMicSet();
+  if (mode !== "idle") { toast("マイクの切り替えは録音を停止してから反映されます。"); return; }
+  const wasTesting = micTesting; releaseMic(true);
+  if (wasTesting) ensureMic().catch(() => {});
+}
+$("micSel").onchange = () => { micSet.deviceId = $("micSel").value; micChanged(); };
+$("farChk").onchange = () => { micSet.far = $("farChk").checked; micChanged(); };
+$("micTestBtn").onclick = async () => {
+  if (mode !== "idle") return;
+  if (micTesting) { releaseMic(); return; }
+  try { await ensureMic(); micTesting = true; $("micTestBtn").textContent = "テスト終了"; }
+  catch (e) { notice(e && e.name === "NotAllowedError" ? "マイクの使用が許可されていません。アドレスバーのマイク設定から許可してください。" : "マイクを起動できませんでした（" + (e && e.name || "不明") + "）。", true); }
+};
+navigator.mediaDevices && navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener("devicechange", listMics);
+listMics();
+
+/* meter */
+let meterData = new Uint8Array(1024), meterLast = 0;
+function drawLevels(){
+  const cv = $("wave"), ctx = cv.getContext("2d");
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (!w) return;
+  if (cv.width !== w * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(mode === "recording" ? "--rec" : mode === "idle" && micTesting ? "--blue" : "--sub").trim();
+  levels.forEach((l, i) => { const bh = Math.max(2, l * (h - 8)); ctx.fillRect(w - (levels.length - i) * 4, (h - bh) / 2, 2.5, bh); });
+}
+function startMeter(){
+  if (rafId) return;
+  const draw = ts => {
+    rafId = requestAnimationFrame(draw);
+    if (ts - meterLast < 60) return; meterLast = ts;
+    let lv = 0;
+    if (analyser && mode !== "paused") { analyser.getByteTimeDomainData(meterData); let sum = 0; for (const v of meterData) { const x = (v - 128) / 128; sum += x*x; } lv = Math.min(1, Math.sqrt(sum / meterData.length) * 4); }
+    levels.push(lv); const n = Math.floor($("wave").clientWidth / 4); if (levels.length > n) levels.splice(0, levels.length - n);
+    drawLevels();
+  };
+  rafId = requestAnimationFrame(draw);
+}
+function setProgress(s){ const p = Math.min(100, s / 1200 * 100); $("progressBar").style.width = p + "%"; $("progress").classList.toggle("over", s > 1200); }
+
+async function requestWake(){ try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {} }
+function releaseWake(){ try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null; }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && mode !== "idle") requestWake(); });
+window.addEventListener("beforeunload", e => { if (mode !== "idle") { e.preventDefault(); e.returnValue = ""; } });
+
+/* ---------- buttons state ---------- */
+function updateButtons(){
+  const rec = mode !== "idle";
+  $("recBtn").classList.toggle("on", rec);
+  $("recLabel").textContent = rec ? "停止" : "録音";
+  $("recBtn").setAttribute("aria-label", rec ? "録音停止" : "録音開始");
+  $("pauseBtn").disabled = !rec; $("pauseBtn").textContent = mode === "paused" ? "再開" : "一時停止";
+  $("markBtn").disabled = mode !== "recording";
+  const pill = $("statePill");
+  pill.className = "pill" + (mode === "recording" ? " rec" : mode === "paused" ? " pause" : "");
+  pill.textContent = mode === "recording" ? "録音中" : mode === "paused" ? "一時停止中" : "待機中";
+  const hasTx = !!(cur && cur.segments.length);
+  const manual = capsReady && !sample;
+  $("sumBtn").disabled = rec || !hasTx || (!sample && !manual) || summarizing;
+  $("sumBtn").textContent = manual ? "要約用の指示をコピー" : (cur && cur.summary ? "要約を作り直す" : "要約を作成");
+  const hasAny = !!(cur && (hasTx || cur.summary));
+  const canDl = !!downloads || capsReady;
+  $("docxBtn").disabled = rec || !hasAny || !canDl || !window.docx;
+  $("pdfBtn").disabled = rec || !hasAny || !canDl || !window.html2pdf;
+  $("txtBtn").disabled = rec || !hasTx || !canDl;
+  $("audioBtn").disabled = rec || !canDl || !(cur && (audioCache.has(cur.id) || cur.audioAssetId || cur.hasLocalAudio));
+  $("delBtn").disabled = rec || !cur || cur.status === "draft";
+  $("editTxBtn").disabled = rec;
+  document.querySelectorAll(".fields input").forEach(i => i.disabled = false);
+}
+
+/* ---------- summary ---------- */
+let summarizing = false, sumCtl = null;
+const LEVEL_TEXT = { short: "簡潔（各項目1〜2文、主要ポイントは3〜4個）", normal: "標準（各項目2〜4文、主要ポイントは5〜7個）", long: "詳細（各項目4〜8文、主要ポイントは8〜12個、数値や具体例も漏らさず）" };
+
+function buildPrompt(r){
+  const bms = (r.bookmarks || []).map(b => "[" + fmt(b.t) + "]").join(", ");
+  let tx = segmentsToText(r.segments); if (tx.length > 90000) tx = tx.slice(0, 90000) + "\n…（以下省略）";
+  return [
+    "あなたは学会講演の聴講記録をまとめる専門アシスタントです。以下は約" + Math.max(1, Math.round(r.durationSec / 60)) + "分の学会講演を音声認識で文字起こししたものです。",
+    "音声認識による誤変換（特に専門用語・人名・数値）が含まれるため、文脈から正しい語を推定して解釈してください。ただし文字起こしに無い事実を作ってはいけません。",
+    "",
+    "講演タイトル: " + (r.title || "不明"),
+    "学会名・セッション: " + (r.conference || "不明"),
+    "講演者: " + (r.speaker || "不明"),
+    "聴講者が「重要」とマークした時刻: " + (bms || "なし") + "（その時刻の前後30秒の内容を特に重視して要約に反映すること）",
+    "聴講者のメモ: " + (r.memo ? r.memo : "なし"),
+    "要約の詳しさ: " + LEVEL_TEXT[r.summaryLevel || "normal"],
+    "",
+    "次のJSONオブジェクトだけを出力してください（前置き・コードブロック記号は不要）:",
+    '{"overview":"講演全体の要旨","background":"背景・目的","methods":"方法・対象","results":"主な結果（数値があれば含める）","conclusion":"結論・考察・今後の展望","keyPoints":["重要ポイント"],"marked":[{"time":"mm:ss","content":"重要マーク箇所で述べられていた内容"}],"qa":[{"q":"質問","a":"回答"}],"keywords":["専門用語・キーワード"],"followUps":["聴講者が後で調べる・質問すると良い点"]}',
+    "該当内容が無い項目は空文字列または空配列にしてください。すべて日本語で書いてください。",
+    "",
+    "=== 文字起こし ===",
+    tx
+  ].join("\n");
+}
+
+$("level").onchange = () => { if (cur) { cur.summaryLevel = $("level").value; if (cur.status !== "draft") saveSoon(); } };
+$("stopSumBtn").onclick = () => sumCtl && sumCtl.abort();
+async function copyText(t){
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  try { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok; } catch (e) { return false; }
+}
+function showManualSummary(prompt, copied){
+  const box = $("summaryBox"); box.innerHTML = "";
+  const p = document.createElement("p");
+  p.textContent = copied
+    ? "要約用の指示と文字起こしをコピーしました。claude.ai を開いて新しいチャットに貼り付けて送信し、返ってきた回答（{ から始まる部分）を下に貼り付けて「要約を反映」を押してください。"
+    : "自動でコピーできませんでした。下の枠の中身をすべて選択してコピーし、claude.ai に貼り付けて送信してください。返ってきた回答で枠の中身を置き換えて「要約を反映」を押してください。";
+  const ta = document.createElement("textarea"); ta.className = "edit"; ta.style.minHeight = "160px";
+  ta.placeholder = "ここにClaudeの回答を貼り付け"; if (!copied) ta.value = prompt;
+  const bar = document.createElement("div"); bar.className = "toolbar"; bar.style.marginTop = "8px";
+  const again = document.createElement("button"); again.className = "btn"; again.textContent = "もう一度コピー";
+  again.onclick = async () => toast(await copyText(prompt) ? "コピーしました" : "コピーできませんでした");
+  const apply = document.createElement("button"); apply.className = "btn primary"; apply.textContent = "要約を反映";
+  apply.onclick = async () => {
+    let t = ta.value.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "");
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    try { const obj = JSON.parse(t.slice(a, b + 1)); cur.summary = normalizeSummary(obj); cur.summarizedAt = Date.now(); await save(); renderSummary(); updateButtons(); toast("要約を反映しました"); }
+    catch (e) { toast("回答を読み取れませんでした。{ から } までをそのまま貼り付けてください。"); }
+  };
+  bar.append(again, apply); box.append(p, ta, bar);
+}
+
+$("sumBtn").onclick = async () => {
+  if (cur && !sample && capsReady && !summarizing) {
+    if (txEditing) closeTxEdit(true);
+    cur.summaryLevel = $("level").value;
+    const prompt = buildPrompt(cur);
+    showManualSummary(prompt, await copyText(prompt));
+    return;
+  }
+  if (!cur || !sample || summarizing) return;
+  if (txEditing) closeTxEdit(true);
+  cur.summaryLevel = $("level").value;
+  const target = cur;
+  summarizing = true; sumCtl = new AbortController(); updateButtons();
+  $("stopSumBtn").classList.remove("hidden");
+  const box = $("summaryBox"); box.innerHTML = "";
+  const th = document.createElement("div"); th.className = "thinking"; th.innerHTML = '<span class="spin"></span><span>要約を作成しています。20分の講演で30秒〜1分ほどかかります。</span>'; box.appendChild(th);
+  try {
+    const res = await sample.json(buildPrompt(target), { signal: sumCtl.signal, modelTier: "default", cache: false });
+    target.summary = normalizeSummary(res); target.summarizedAt = Date.now();
+    if (cur === target) { await save(); renderSummary(); toast("要約を作成しました"); }
+    else if (db) await col.doc(target.id).set(JSON.parse(JSON.stringify(target)));
+  } catch (e) {
+    const code = e && e.code;
+    const msg = code === "cancelled" ? "要約を中止しました。" :
+      code === "not_granted" ? "Claudeの利用が許可されなかったため要約できません。もう一度押すと許可を求めます（ページの再読み込みが必要な場合があります）。" :
+      code === "rate_limited" ? "リクエストが集中しています。少し待ってからもう一度お試しください。" :
+      "要約を作成できませんでした（" + (code || "error") + "）。もう一度お試しください。";
+    if (cur === target) { renderSummary(); const n = document.createElement("div"); n.className = "notice" + (code === "cancelled" ? "" : " err"); n.textContent = msg; $("summaryBox").prepend(n); }
+  } finally {
+    summarizing = false; sumCtl = null; $("stopSumBtn").classList.add("hidden"); updateButtons();
+  }
+};
+function normalizeSummary(s){
+  s = s && typeof s === "object" ? s : {};
+  const str = v => typeof v === "string" ? v : "";
+  const arr = v => Array.isArray(v) ? v : [];
+  return { overview: str(s.overview), background: str(s.background), methods: str(s.methods), results: str(s.results), conclusion: str(s.conclusion),
+    keyPoints: arr(s.keyPoints).map(String), marked: arr(s.marked).map(m => ({ time: str(m && m.time), content: str(m && m.content) })).filter(m => m.content),
+    qa: arr(s.qa).map(x => ({ q: str(x && x.q), a: str(x && x.a) })).filter(x => x.q), keywords: arr(s.keywords).map(String), followUps: arr(s.followUps).map(String) };
+}
+function sections(s){
+  return [
+    ["概要", "text", s.overview], ["背景・目的", "text", s.background], ["方法", "text", s.methods], ["結果", "text", s.results],
+    ["結論・考察", "text", s.conclusion], ["重要ポイント", "list", s.keyPoints],
+    ["★ 重要マーク箇所", "list", (s.marked || []).map(m => (m.time ? "[" + m.time + "] " : "") + m.content)],
+    ["質疑応答", "qa", s.qa], ["キーワード", "chips", s.keywords], ["後で確認したい点", "list", s.followUps]
+  ].filter(([, , v]) => Array.isArray(v) ? v.length : v && v.trim());
+}
+function renderSummary(){
+  const box = $("summaryBox"); box.innerHTML = "";
+  if (!cur || !cur.summary) {
+    const e = document.createElement("div"); e.className = "empty";
+    e.textContent = !sample && window.claude && !capsReady ? "要約機能を読み込み中です…" :
+      !sample && capsReady && cur && cur.segments.length ? "このファイル版では自動要約ができないため、「要約用の指示をコピー」→ claude.ai に貼り付け → 回答をここに貼り付け、の手順で要約します。" :
+      cur && cur.segments.length ? "「要約を作成」を押すと、文字起こしとメモから要約します。" : "録音を停止すると、文字起こしから要約を作成できます。";
+    box.appendChild(e); return;
+  }
+  for (const [h, type, v] of sections(cur.summary)) {
+    const h3 = document.createElement("h3"); h3.textContent = h; box.appendChild(h3);
+    if (type === "text") { const p = document.createElement("p"); p.textContent = v; box.appendChild(p); }
+    else if (type === "list") { const ul = document.createElement("ul"); v.forEach(x => { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); }); box.appendChild(ul); }
+    else if (type === "chips") { const d = document.createElement("div"); d.className = "chips"; v.forEach(x => { const s = document.createElement("span"); s.textContent = x; d.appendChild(s); }); box.appendChild(d); }
+    else if (type === "qa") { const dl = document.createElement("dl"); dl.className = "qa"; v.forEach(x => { const dt = document.createElement("dt"); dt.textContent = "Q. " + x.q; const dd = document.createElement("dd"); dd.textContent = "A. " + (x.a || "（回答不明）"); dl.append(dt, dd); }); box.appendChild(dl); }
+  }
+}
+
+/* ---------- audio ---------- */
+function renderAudio(){
+  const box = $("audioBox"); box.innerHTML = "";
+  if (!cur || mode !== "idle") return;
+  let src = null;
+  if (audioCache.has(cur.id)) src = URL.createObjectURL(audioCache.get(cur.id));
+  else if (cur.audioAssetId) src = "/_blob/" + cur.audioAssetId;
+  else if (cur.hasLocalAudio && idb) {
+    const id = cur.id;
+    idbReq("audio", "get", id).then(b => { if (b) { audioCache.set(id, b); if (cur && cur.id === id) { renderAudio(); updateButtons(); } } }).catch(() => {});
+    return;
+  }
+  if (!src) return;
+  const a = document.createElement("audio"); a.controls = true; a.preload = "metadata"; a.src = src; box.appendChild(a);
+  const h = document.createElement("div"); h.className = "hint";
+  h.textContent = (cur.audioAssetId || cur.hasLocalAudio) ? "音声は記録と一緒に保存されています。" : (assets || idb ? "音声を保存しています…" : "音声はこの画面を開いている間だけ再生・保存できます。必要なら「音声」ボタンで保存してください。");
+  box.appendChild(h);
+}
+async function getAudioBlob(){
+  if (audioCache.has(cur.id)) return audioCache.get(cur.id);
+  if (cur.hasLocalAudio && idb) { const b = await idbReq("audio", "get", cur.id); if (b) return b; }
+  if (cur.audioAssetId) { const r = await fetch("/_blob/" + cur.audioAssetId); if (!r.ok) throw new Error("fetch"); return await r.blob(); }
+  return null;
+}
+
+/* ---------- export ---------- */
+function baseName(){ const s = ((cur.date || today()) + "_" + (cur.title || "講演")).replace(/[\\/:*?"<>|\n\r]+/g, "_").slice(0, 80); return s; }
+async function offer(filename, data){
+  if (!downloads) {
+    const blob = data instanceof Blob ? data : new Blob(["\ufeff" + data], { type: "text/plain;charset=utf-8" });
+    if (window.showSaveFilePicker) {
+      try {
+        const ext = (filename.match(/\.[^.]+$/) || [".bin"])[0];
+        const h = await window.showSaveFilePicker({ suggestedName: filename, types: [{ description: ext.slice(1).toUpperCase() + " ファイル", accept: { [blob.type.split(";")[0] || "application/octet-stream"]: [ext] } }] });
+        const w = await h.createWritable(); await w.write(blob); await w.close();
+        toast("保存しました：" + filename); return;
+      } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try {
+      const url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast("ダウンロードしました：" + filename);
+    } catch (e) { toast("保存できませんでした。"); }
+    return;
+  }
+  try { await downloads.save({ filename, data }); toast("保存しました：" + filename); }
+  catch (e) { if (e && e.code === "declined") return; toast(e && e.code === "rate_limited" ? "保存の確認画面がすでに開いています。" : "保存できませんでした（" + (e && e.code || "error") + "）"); }
+}
+$("txtBtn").onclick = () => {
+  const head = [cur.title, cur.date, cur.conference, cur.speaker].filter(Boolean).join("\n");
+  offer(baseName() + "_文字起こし.txt", head + "\n\n" + segmentsToText(cur.segments) + (cur.memo ? "\n\n--- メモ ---\n" + cur.memo : ""));
+};
+$("audioBtn").onclick = async () => {
+  try { const b = await getAudioBlob(); if (!b) return; offer(baseName() + (b.type.includes("mp4") ? ".mp4" : ".webm"), b); }
+  catch (e) { toast("音声を読み込めませんでした。"); }
+};
+
+$("docxBtn").onclick = async () => {
+  const D = window.docx; if (!D) return;
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle } = D;
+  const F = "Yu Gothic";
+  const P = (text, opt = {}) => new Paragraph({ children: [new TextRun({ text, font: F, size: opt.size || 22, bold: opt.bold, color: opt.color })], spacing: { after: opt.after ?? 120, line: 320 }, ...opt.p });
+  const H = text => new Paragraph({ children: [new TextRun({ text, font: F, size: 26, bold: true, color: "2E5B88" })], spacing: { before: 280, after: 100 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "C9D3DE", space: 2 } } });
+  const B = text => new Paragraph({ children: [new TextRun({ text, font: F, size: 22 })], bullet: { level: 0 }, spacing: { after: 60, line: 300 } });
+  const kids = [];
+  kids.push(new Paragraph({ children: [new TextRun({ text: cur.title || "講演記録", font: F, size: 36, bold: true })], spacing: { after: 160 } }));
+  const meta = [["日付", cur.date], ["学会・セッション", cur.conference], ["講演者", cur.speaker], ["録音時間", cur.durationSec ? fmt(cur.durationSec) : ""]].filter(x => x[1]);
+  meta.forEach(([k, v]) => kids.push(P(k + "：" + v, { size: 20, color: "5B6776", after: 40 })));
+  if (cur.summary) {
+    for (const [h, type, v] of sections(cur.summary)) {
+      kids.push(H(h));
+      if (type === "text") v.split(/\n+/).forEach(line => kids.push(P(line)));
+      else if (type === "list") v.forEach(x => kids.push(B(x)));
+      else if (type === "chips") kids.push(P(v.join("、")));
+      else if (type === "qa") v.forEach(x => { kids.push(P("Q. " + x.q, { bold: true, after: 40 })); kids.push(P("A. " + (x.a || "（回答不明）"))); });
+    }
+  }
+  if (cur.memo) { kids.push(H("自分のメモ")); cur.memo.split(/\n/).forEach(l => kids.push(P(l || " "))); }
+  if (cur.segments.length) {
+    kids.push(new Paragraph({ children: [], pageBreakBefore: true }));
+    kids.push(H("付録：文字起こし（自動音声認識）"));
+    cur.segments.forEach(s => kids.push(new Paragraph({ children: [new TextRun({ text: "[" + fmt(s.t) + "] ", font: F, size: 18, color: "8A96A3" }), new TextRun({ text: s.text, font: F, size: 20 })], spacing: { after: 40 } })));
+  }
+  const doc = new Document({ styles: { default: { document: { run: { font: F } } } },
+    sections: [{ properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children: kids }] });
+  try { const blob = await Packer.toBlob(doc); offer(baseName() + "_要約.docx", blob); }
+  catch (e) { toast("Wordファイルを作成できませんでした。"); }
+};
+
+$("pdfBtn").onclick = async () => {
+  if (!window.html2pdf) return;
+  $("pdfBtn").disabled = true; toast("PDFを作成しています…");
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  let body = "";
+  if (cur.summary) for (const [h, type, v] of sections(cur.summary)) {
+    body += '<h2>' + esc(h) + '</h2>';
+    if (type === "text") body += v.split(/\n+/).map(l => "<p>" + esc(l) + "</p>").join("");
+    else if (type === "list") body += "<ul>" + v.map(x => "<li>" + esc(x) + "</li>").join("") + "</ul>";
+    else if (type === "chips") body += "<p>" + v.map(esc).join("、") + "</p>";
+    else if (type === "qa") body += v.map(x => '<p class="q">Q. ' + esc(x.q) + '</p><p>A. ' + esc(x.a || "（回答不明）") + "</p>").join("");
+  }
+  if (cur.memo) body += "<h2>自分のメモ</h2>" + cur.memo.split(/\n/).map(l => "<p>" + esc(l) + "</p>").join("");
+  if (cur.segments.length) body += '<div class="pb"></div><h2>付録：文字起こし（自動音声認識）</h2>' + cur.segments.map(s => '<p class="seg"><span>[' + fmt(s.t) + "]</span> " + esc(s.text) + "</p>").join("");
+  const meta = [["日付", cur.date], ["学会・セッション", cur.conference], ["講演者", cur.speaker], ["録音時間", cur.durationSec ? fmt(cur.durationSec) : ""]].filter(x => x[1]).map(([k, v]) => esc(k) + "：" + esc(v)).join("<br>");
+  const el = document.createElement("div");
+  el.innerHTML = '<style>.pdf{font-family:' + "'Zen Kaku Gothic New','Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif" + ';color:#1B2633;font-size:11pt;line-height:1.75;width:180mm;background:#fff}' +
+    '.pdf h1{font-size:18pt;margin:0 0 6px}.pdf .meta{color:#5B6776;font-size:9.5pt;margin-bottom:10px}' +
+    '.pdf h2{font-size:12.5pt;color:#2E5B88;border-bottom:1px solid #C9D3DE;padding-bottom:2px;margin:16px 0 6px;page-break-after:avoid}' +
+    '.pdf p{margin:0 0 5px}.pdf ul{margin:0;padding-left:1.3em}.pdf li{margin-bottom:3px}.pdf .q{font-weight:700}' +
+    '.pdf .seg{font-size:9.5pt;margin:0 0 2px}.pdf .seg span{color:#8A96A3}.pdf .pb{page-break-before:always}</style>' +
+    '<div class="pdf"><h1>' + esc(cur.title || "講演記録") + '</h1><div class="meta">' + meta + "</div>" + body + "</div>";
+  try {
+    const blob = await html2pdf().set({ margin: [12, 15, 12, 15], image: { type: "jpeg", quality: 0.95 }, html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }, pagebreak: { mode: ["css", "avoid-all"] } }).from(el).outputPdf("blob");
+    await offer(baseName() + "_要約.pdf", blob);
+  } catch (e) { toast("PDFを作成できませんでした。Word出力をお試しください。"); }
+  finally { updateButtons(); }
+};
+
+$("delBtn").onclick = async () => {
+  if (!cur) return;
+  const ok = await confirmDlg("「" + (cur.title || "無題の講演") + "」を削除します。文字起こし・要約・音声は元に戻せません。");
+  if (!ok) return;
+  const id = cur.id, asset = cur.audioAssetId;
+  try {
+    if (db) await col.doc(id).delete();
+    else { localRecords.delete(id); if (idb) { await idbReq("records", "delete", id); await idbReq("audio", "delete", id).catch(() => {}); } }
+    if (asset && assets) assets.delete(asset).catch(() => {});
+    audioCache.delete(id); cur = newRecord(); showRecord(); toast("削除しました");
+  } catch (e) { toast("削除できませんでした（" + (e.code || "error") + "）"); }
+};
+
+/* ---------- init ---------- */
+cur = newRecord(); showRecord();
+initCaps();
+})();
+</script>
+</body>
+</html>
